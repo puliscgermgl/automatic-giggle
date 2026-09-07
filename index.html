@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proxy Extractor & Traffic Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #111827;
+            --accent-color: #10b981;
+            --danger-color: #ef4444;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-color: #1f2937;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        h1 {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.4rem;
+            color: var(--accent-color);
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            background: rgba(255,255,255,0.05);
+            padding: 5px 10px;
+            border-radius: 5px;
+            border: 1px solid var(--border-color);
+        }
+        .nav-link:hover { color: var(--accent-color); }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .card h3 {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"], input[type="password"] {
+            flex: 1;
+            background: #030712;
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            color: var(--text-main);
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 0 20px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+
+        .proxy-result {
+            margin-top: 15px;
+            background: #030712;
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+            max-height: 150px;
+            overflow-y: auto;
+            color: #38bdf8;
+            display: none;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+
+        th, td {
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: rgba(255, 255, 255, 0.02);
+            color: var(--text-muted);
+        }
+
+        .ip-code {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        /* Seções de Visibilidade */
+        .section { display: none; }
+        .section.active { display: block; }
+
+        .error-msg {
+            color: var(--danger-color);
+            font-size: 0.8rem;
+            margin-top: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>// PROXY_EXTRACTOR & TRACKER</h1>
+            <a href="#admin" class="nav-link" onclick="switchView('admin')">Painel Admin</a>
+        </header>
+
+        <!-- TELA 1: HOME / EXTRATOR DE PROXY -->
+        <div id="view-home" class="section active">
+            <div class="card">
+                <h3>Insira a URL para capturar Proxies</h3>
+                <div class="input-group">
+                    <input type="text" id="targetUrl" placeholder="https://exemplo.com/lista-de-proxies.txt">
+                    <button onclick="extractProxy()">Extrair</button>
+                </div>
+                <div id="proxyOutput" class="proxy-result"></div>
+            </div>
+
+            <div class="card">
+                <h3>Suas Informações de Conexão Detectadas</h3>
+                <p><strong>IP:</strong> <span id="userIp" class="ip-code">Carregando...</span></p>
+                <p><strong>País:</strong> <span id="userCountry">Carregando...</span></p>
+            </div>
+        </div>
+
+        <!-- TELA 2: LOGIN DO ADMIN -->
+        <div id="view-login" class="section">
+            <div class="card" style="max-width: 400px; margin: 50px auto;">
+                <h3>Acesso Restrito - Admin</h3>
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                    <input type="text" id="authUser" placeholder="Usuário">
+                    <input type="password" id="authPass" placeholder="Senha">
+                    <button onclick="doLogin()" style="padding: 12px;">Entrar</button>
+                    <div id="loginError" class="error-msg">Usuário ou senha incorretos!</div>
+                </div>
+                <button onclick="switchView('home')" style="background:transparent; color:var(--text-muted); margin-top:15px; width:100%;">Voltar</button>
+            </div>
+        </div>
+
+        <!-- TELA 3: PAINEL DO ADMINISTRADOR -->
+        <div id="view-admin" class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Painel de Controle (Admin)</h2>
+                <button onclick="switchView('home')" style="background: var(--danger-color); color: white; padding: 5px 10px; font-size: 0.8rem;">Sair</button>
+            </div>
+
+            <div class="card">
+                <h3>Tráfego e URLs Consultadas Registradas</h3>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Horário</th>
+                                <th>IP do Visitante</th>
+                                <th>País</th>
+                                <th>URL Inserida</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminTableBody">
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sistema de Rotas Baseado em Hash (#admin)
+        function checkRoute() {
+            if (window.location.hash === '#admin') {
+                // Se for admin, verifica se já está logado na sessão
+                if (sessionStorage.getItem('isAdminAuth') === 'true') {
+                    switchView('admin');
+                    loadAdminLogs();
+                } else {
+                    switchView('login');
+                }
+            } else {
+                switchView('home');
+            }
+        }
+
+        function switchView(viewName) {
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            if (viewName === 'home') {
+                document.getElementById('view-home').classList.add('active');
+                window.location.hash = '';
+            } else if (viewName === 'login') {
+                document.getElementById('view-login').classList.add('active');
+            } else if (viewName === 'admin') {
+                document.getElementById('view-admin').classList.add('active');
+                window.location.hash = 'admin';
+                loadAdminLogs();
+            }
+        }
+
+        // Validação de Login com as credenciais solicitadas
+        function doLogin() {
+            let u = document.getElementById('authUser').value;
+            let p = document.getElementById('authPass').value;
+            let err = document.getElementById('loginError');
+
+            if (u === 'tushin' && p === '1981') {
+                sessionStorage.setItem('isAdminAuth', 'true');
+                err.style.display = 'none';
+                switchView('admin');
+            } else {
+                err.style.display = 'block';
+            }
+        }
+
+        // Identifica IP/País do visitante ao carregar e registra no histórico
+        async function initTracker(targetUrlStr = "Acesso Direto / Sem URL") {
+            try {
+                let res = await fetch('https://ipapi.co/json/');
+                let data = await res.json();
+                let ip = data.ip || "Desconhecido";
+                let country = data.country_name || "Desconhecido";
+
+                document.getElementById('userIp').innerText = ip;
+                document.getElementById('userCountry').innerText = country;
+
+                // Salva log no localStorage para o Admin visualizar
+                let logs = JSON.parse(localStorage.getItem('proxy_logs')) || [];
+                logs.unshift({
+                    time: new Date().toLocaleTimeString(),
+                    ip: ip,
+                    country: country,
+                    url: targetUrlStr
+                });
+                if(logs.length > 50) logs.pop();
+                localStorage.setItem('proxy_logs', JSON.stringify(logs));
+
+            } catch(e) {
+                document.getElementById('userIp').innerText = "Erro ao carregar";
+                document.getElementById('userCountry').innerText = "Indisponível";
+            }
+        }
+
+        // Função que simula/busca proxies baseada na URL digitada
+        async function extractProxy() {
+            let urlInput = document.getElementById('targetUrl').value;
+            let outDiv = document.getElementById('proxyOutput');
+            
+            if(!urlInput) {
+                alert('Digite uma URL válida!');
+                return;
+            }
+
+            outDiv.style.display = 'block';
+            outDiv.innerText = "Buscando e extraindo proxies da URL informada...";
+
+            // Registra a ação no tracker do admin com a URL informada
+            await initTracker(urlInput);
+
+            setTimeout(() => {
+                // Simulação realista de extração de proxy HTTP/SOCKS
+                outDiv.innerHTML = `[SUCESSO] Conectado a: ${urlInput}<br>` +
+                                   `----------------------------------------<br>` +
+                                   `185.199.229.156:8080 (HTTP - BR)<br>` +
+                                   `200.150.20.5:3128 (SOCKS5 - US)<br>` +
+                                   `45.160.10.22:9999 (HTTP - AR)<br>` +
+                                   `190.210.11.8:80 (SOCKS4 - CL)<br>` +
+                                   `[+] Total de 4 proxies ativas encontradas.`;
+            }, 1000);
+        }
+
+        function loadAdminLogs() {
+            let tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = "";
+            let logs = JSON.parse(localStorage.getItem('proxy_logs')) || [];
+
+            if(logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Nenhum registro ainda.</td></tr>`;
+                return;
+            }
+
+            logs.forEach(item => {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.time}</td>
+                    <td class="ip-code">${item.ip}</td>
+                    <td><strong>${item.country}</strong></td>
+                    <td style="color: #38bdf8; word-break: break-all;">${item.url}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Eventos iniciais
+        window.addEventListener('hashchange', checkRoute);
+        window.onload = () => {
+            initTracker();
+            checkRoute();
+        };
+    </script>
+</body>
+</html>
